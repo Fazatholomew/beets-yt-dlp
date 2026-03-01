@@ -53,7 +53,7 @@ class YtDlpPlugin(BeetsPlugin):
         super(YtDlpPlugin, self).__init__()
 
         self.config_dir = config.config_dir()
-        self.cache_dir = self.config_dir + "/ydl-cache"
+        self.cache_dir = self.config_dir + "/yt-dlp-cache"
         self.outtmpl = self.cache_dir + "/%(id)s/%(id)s.%(ext)s"
 
         # Default options
@@ -100,7 +100,7 @@ class YtDlpPlugin(BeetsPlugin):
             If --search is passed, each arg is treated as a search query
             rather than a direct URL. The plugin will:
               1. Search YouTube for the top 10 matching results.
-              2. Rank those results via `rank_results()` (placeholder).
+              2. Rank those results via `rank_results()`.
               3. Download the top-ranked result using the normal flow.
 
             NORMAL FLOW (unchanged):
@@ -126,7 +126,7 @@ class YtDlpPlugin(BeetsPlugin):
             elif self.config.get("urls") is not None:
                 # Fallback to URLs defined in the beets config file (unchanged).
                 if self.config.get("verbose"):
-                    print("[ydl] Falling back to default urls")
+                    print("[yt-dlp] Falling back to default urls")
                 for url in self.config.get("urls"):
                     outer_class.youtubedl(lib, opts, str(url))
 
@@ -192,8 +192,8 @@ class YtDlpPlugin(BeetsPlugin):
         # query string rather than a direct URL.
         #
         # Example usage:
-        #   beet ydl --search "Pink Floyd - The Wall"
-        #   beet ydl -s "Radiohead - OK Computer"
+        #   beet yt-dlp --search "Pink Floyd - The Wall"
+        #   beet yt-dlp -s "Radiohead - OK Computer"
         # --------------------------------------------------------------------
         parser.add_option(
             "-s",
@@ -206,15 +206,12 @@ class YtDlpPlugin(BeetsPlugin):
         )
 
         ydl_cmd = ui.Subcommand(
-            "ydl", parser=parser, help="Download music from YouTube"
+            "yt-dlp", parser=parser, help="Download music from YouTube"
         )
         ydl_cmd.func = ydl_func
 
         return [ydl_cmd]
 
-    # --------------------------------------------------------------------------
-    # NEW METHOD: search_and_download
-    # --------------------------------------------------------------------------
     def search_and_download(self, lib, opts, query):
         """Search YouTube for `query`, rank the top 10 results, then download
         the highest-ranked one using the normal `youtubedl()` flow.
@@ -230,24 +227,23 @@ class YtDlpPlugin(BeetsPlugin):
         ----
         1. Build a yt-dlp "ytsearch10:" URL so that yt-dlp returns exactly
            the first 10 YouTube search results without downloading anything.
-        2. Pass those 10 candidate entries to `rank_results()` where YOU
-           (the developer) will implement the ranking logic.
+        2. Pass those 10 candidate entries to `rank_results()`.
         3. Take the URL of the top-ranked entry and hand it to the existing
            `youtubedl()` method unchanged.
         """
         if self.config.get("verbose"):
-            print("[ydl] Search mode: querying YouTube for: " + query)
+            print("[yt-dlp] Search mode: querying YouTube for: " + query)
 
         # Fetch the top-10 search results metadata (no download yet).
         results = self.search_youtube(query)
 
         if not results:
             # Nothing came back — abort gracefully.
-            print("[ydl] Search returned no results for: " + query)
+            print("[yt-dlp] Search returned no results for: " + query)
             return
 
         if self.config.get("verbose"):
-            print("[ydl] Retrieved %d search results" % len(results))
+            print("[yt-dlp] Retrieved %d search results" % len(results))
             for i, r in enumerate(results):
                 # Show a numbered list so the developer can see what came back
                 # when running with -v.  Fields available on each entry:
@@ -257,7 +253,7 @@ class YtDlpPlugin(BeetsPlugin):
                 #   r["view_count"] — view count (may be None)
                 #   r["webpage_url"] — full YouTube URL
                 print(
-                    "[ydl]   %2d. [%s] %s (views: %s, duration: %ss)"
+                    "[yt-dlp]   %2d. [%s] %s (views: %s, duration: %ss)"
                     % (
                         i + 1,
                         r.get("id", "?"),
@@ -278,9 +274,10 @@ class YtDlpPlugin(BeetsPlugin):
 
         if self.config.get("verbose"):
             print(
-                "[ydl] Top-ranked result: [%s] %s" % (best.get("id"), best.get("title"))
+                "[yt-dlp] Top-ranked result: [%s] %s"
+                % (best.get("id"), best.get("title"))
             )
-            print("[ydl] Handing off to normal download flow: " + best_url)
+            print("[yt-dlp] Handing off to normal download flow: " + best_url)
 
         # -----------------------------------------------------------------------
         # Hand the winning URL to the original download method.
@@ -288,9 +285,6 @@ class YtDlpPlugin(BeetsPlugin):
         # -----------------------------------------------------------------------
         self.youtubedl(lib, opts, best_url)
 
-    # --------------------------------------------------------------------------
-    # NEW METHOD: search_youtube
-    # --------------------------------------------------------------------------
     def search_youtube(self, query):
         """Use yt-dlp to retrieve the top 10 YouTube search results for
         `query` WITHOUT downloading any media.
@@ -332,7 +326,7 @@ class YtDlpPlugin(BeetsPlugin):
                 # so we can access the "entries" list directly.
                 ie_result = ydl.extract_info(search_url, download=False)
         except Exception as e:
-            print("[ydl] Search error: " + str(e))
+            print("[yt-dlp] Search error: " + str(e))
             return []
 
         if ie_result is None:
@@ -347,15 +341,13 @@ class YtDlpPlugin(BeetsPlugin):
 
         return entries
 
-    # --------------------------------------------------------------------------
-    # NEW METHOD: rank_results  (PLACEHOLDER — implement your logic here)
-    # --------------------------------------------------------------------------
     def rank_results(self, results, query):
         """Rank a list of YouTube search-result entries and return them sorted
         from best to worst match.
 
-        THIS IS A PLACEHOLDER.  The current implementation returns the results
-        in the original order that YouTube provided (i.e. no re-ranking).
+        Current implementation is using only basic metadata returned by yt-dlp.
+        Future improvements could include metadata from the requested media and
+        comparing them with the results metadata.
 
         Parameters
         ----------
@@ -371,42 +363,28 @@ class YtDlpPlugin(BeetsPlugin):
                 "webpage_url" — full watch URL
 
         query : str
-            The original search string the user typed, which you can use
-            for fuzzy title matching if desired.
+            The original search string the user typed
 
         Returns
         -------
         list[dict]
             The same list re-ordered so that index 0 is the best match.
             `search_and_download` will always pick `ranked[0]`.
-
-        Implementation hints
-        --------------------
-        Some ideas for ranking signals you might combine:
-          - Title similarity to `query` (e.g. using difflib.SequenceMatcher)
-          - View count (higher = more popular)
-          - Duration heuristics (e.g. prefer tracks ~3-5 min for singles,
-            prefer >30 min for full albums)
-          - Channel reputation / exact artist name match
-          - Upload date (prefer official uploads over re-uploads)
-
-        Example skeleton:
-
-            import difflib
-            def score(entry):
-                title_sim = difflib.SequenceMatcher(
-                    None, query.lower(), (entry.get("title") or "").lower()
-                ).ratio()
-                views = entry.get("view_count") or 0
-                # combine signals however you like:
-                return title_sim * 0.7 + (views / 1_000_000) * 0.3
-
-            return sorted(results, key=score, reverse=True)
         """
-        # -----------------------------------------------------------------------
-        # TODO: Replace the line below with your ranking implementation.
-        # -----------------------------------------------------------------------
-        return results  # placeholder: keep YouTube's original ordering
+
+        import difflib
+
+        def score(entry):
+            title = (entry.get("title") or "").lower()
+            title_sim = difflib.SequenceMatcher(None, query.lower(), title).ratio()
+            views = entry.get("view_count") or 0
+            return (
+                title_sim * 0.7 + (views / 100_000) * 0.3 + 1
+                if "official audio" in title
+                else 0
+            )
+
+        return sorted(results, key=score, reverse=True)
 
     def youtubedl(self, lib, opts, arg):
         """Calls YoutubeDL
@@ -420,7 +398,7 @@ class YtDlpPlugin(BeetsPlugin):
         actually download the audio file.
         """
         if self.config.get("verbose"):
-            print("[ydl] Calling youtube-dl")
+            print("[yt-dlp] Calling youtube-dl")
 
         youtubedl_config = self.config.get("youtubedl_options")
         youtubedl_config["keepvideo"] = self.config.get("keep_files")
@@ -429,12 +407,12 @@ class YtDlpPlugin(BeetsPlugin):
         ie_result = y.extract_info(arg, download=False, process=False)
 
         if ie_result is None:
-            print("[ydl] Error: Failed to fetch file information.")
-            print("[ydl]   If this is not a network problem, try upgrading")
-            print("[ydl]   beets-ydl:")
-            print("[ydl]")
-            print("[ydl]     pip install -U beets-ydl")
-            print("[ydl]")
+            print("[yt-dlp] Error: Failed to fetch file information.")
+            print("[yt-dlp]   If this is not a network problem, try upgrading")
+            print("[yt-dlp]   beets-ydl:")
+            print("[yt-dlp]")
+            print("[yt-dlp]     pip install -U beets-ydl")
+            print("[yt-dlp]")
             exit(1)
 
         if "entries" in ie_result:
@@ -454,13 +432,13 @@ class YtDlpPlugin(BeetsPlugin):
             if len(items) > 0 and not self.config.get("force_download"):
                 if self.config.get("verbose"):
                     print(
-                        "[ydl] Skipping item already in library:"
+                        "[yt-dlp] Skipping item already in library:"
                         + " %s [%s]" % (entry["title"], entry["id"])
                     )
                 continue
 
             if self.config.get("verbose") and not download:
-                print("[ydl] Skipping download: " + entry["id"])
+                print("[yt-dlp] Skipping download: " + entry["id"])
 
             data = y.process_ie_result(entry, download=download)
             if data:
@@ -468,7 +446,7 @@ class YtDlpPlugin(BeetsPlugin):
                 self.info = ie_result
                 self.process_item()
             else:
-                print("[ydl] No data for " + entry["id"])
+                print("[yt-dlp] No data for " + entry["id"])
 
     def is_in_library(self, entry, lib):
         """Check if an `entry` is already in the `lib` beets library"""
@@ -489,7 +467,7 @@ class YtDlpPlugin(BeetsPlugin):
         From here on, the plugin assumes its state according to what
         is being downloaded.
         """
-        print("[ydl] Processing item: " + self.info.get("title"))
+        print("[yt-dlp] Processing item: " + self.info.get("title"))
 
         ext = self.config.get("youtubedl_options")["postprocessors"][0][
             "preferredcodec"
@@ -503,7 +481,7 @@ class YtDlpPlugin(BeetsPlugin):
             and self.config.get("download")
             and not os.path.exists(self.audio_file)
         ):
-            print("[ydl] Error: Audio file not found: " + self.audio_file)
+            print("[yt-dlp] Error: Audio file not found: " + self.audio_file)
             exit(1)
 
         self.strip_fullalbum()
@@ -519,9 +497,9 @@ class YtDlpPlugin(BeetsPlugin):
             self.write_dummy_mp3()
 
         if self.config.get("verbose") and self.is_album():
-            print("[ydl] URL is identified as an album")
+            print("[yt-dlp] URL is identified as an album")
         else:
-            print("[ydl] URL is identified as a singleton")
+            print("[yt-dlp] URL is identified as a singleton")
 
         if (
             self.config.get("split_files")
@@ -533,15 +511,15 @@ class YtDlpPlugin(BeetsPlugin):
         if self.config.get("import"):
             beet_cmd = self.get_beet_cmd()
             if self.config.get("verbose"):
-                print("[ydl] Running beets: " + " ".join(beet_cmd))
+                print("[yt-dlp] Running beets: " + " ".join(beet_cmd))
             subprocess.run(beet_cmd)
         elif self.config.get("verbose"):
-            print("[ydl] Skipping import")
+            print("[yt-dlp] Skipping import")
 
         if not self.config.get("keep_files"):
             self.clean()
         elif self.config.get("verbose") and self.config.get("keep_files"):
-            print("[ydl] Keeping downloaded files on " + self.outdir)
+            print("[yt-dlp] Keeping downloaded files on " + self.outdir)
 
     def get_beet_cmd(self):
         beet_cmd = ["beet"]
@@ -567,10 +545,10 @@ class YtDlpPlugin(BeetsPlugin):
     def __exit__(self, exc_type, exc_value, traceback):
         cache_size = self.config.get("cache_dir")
         if cache_size > 0:
-            print("[ydl] " + cache_size + " in cache")
+            print("[yt-dlp] " + cache_size + " in cache")
 
         if self.config.get("verbose"):
-            print("[ydl] Leaving")
+            print("[yt-dlp] Leaving")
 
     def clean(self):
         """Deletes everything related to the present run."""
@@ -599,7 +577,7 @@ class YtDlpPlugin(BeetsPlugin):
         # @TODO check for overwrites according to options
 
         if self.config.get("verbose"):
-            print("[ydl] Splitting tracks")
+            print("[yt-dlp] Splitting tracks")
 
         cmds = []
         ffmpeg_cmd = ["ffmpeg", "-y", "-i", self.audio_file, "-acodec", "copy"]
@@ -626,7 +604,7 @@ class YtDlpPlugin(BeetsPlugin):
             cmds.append(ffmpeg_cmd + opts)
 
         if len(cmds) > 0 and os.path.exists(self.audio_file):
-            print("[ydl] Running ffmpeg")
+            print("[yt-dlp] Running ffmpeg")
             for cmd in cmds:
                 subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             os.remove(self.audio_file)
@@ -702,17 +680,17 @@ class YtDlpPlugin(BeetsPlugin):
 
     def extract_tracks(self):
         """Try different methods to extract tracks metadata"""
-        print("[ydl] Extracting tracks metadata")
+        print("[yt-dlp] Extracting tracks metadata")
 
         self.tracks = []
         if os.path.exists(self.audio_file):
             self.tracks = self.extract_tracks_from_chapters()
         elif self.config.get("verbose"):
-            print("[ydl] Audio file not found, won't look for chapters")
+            print("[yt-dlp] Audio file not found, won't look for chapters")
 
         if len(self.tracks) == 0:
             if self.config.get("verbose"):
-                print("[ydl] Chapters not found, trying video description")
+                print("[yt-dlp] Chapters not found, trying video description")
             self.tracks = self.extract_tracktimes_from_string(
                 self.info.get("description")
             )
@@ -730,7 +708,7 @@ class YtDlpPlugin(BeetsPlugin):
         if len(self.tracks) > 1:
             for track in self.tracks:
                 output.append(
-                    "[ydl] %03d: %s (%s - %s)"
+                    "[yt-dlp] %03d: %s (%s - %s)"
                     % (
                         track["track"],
                         track["title"],
@@ -741,7 +719,7 @@ class YtDlpPlugin(BeetsPlugin):
         else:
             for track in self.tracks:
                 output.append(
-                    "[ydl] %s (%s - %s)"
+                    "[yt-dlp] %s (%s - %s)"
                     % (
                         track["title"],
                         self.to_hms(track["start"]),
@@ -804,7 +782,7 @@ class YtDlpPlugin(BeetsPlugin):
                 end = self.to_seconds(items[index + 1][1]) - 0.05
 
             if start > end:
-                print("[ydl] Skipping track %d: incorrect timing" % int(index + 1))
+                print("[yt-dlp] Skipping track %d: incorrect timing" % int(index + 1))
                 index += 1
                 skipped += 1
                 continue

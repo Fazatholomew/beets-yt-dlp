@@ -7,3 +7,4 @@ env.lib.db
 *.egg-info
 
 __pycache__
+./venv
