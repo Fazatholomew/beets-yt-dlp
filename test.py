@@ -10,9 +10,9 @@ from hashlib import md5
 # second field, and then run the test
 #
 TESTS = [
-    ("4e4372f5d09d872b69654c81620bf6ac", "https://www.youtube.com/watch?v=uMMUcxvWOkY"),
-    ("bb31adda714de9244de82ef6dbff806e", "https://www.youtube.com/watch?v=Zi_XLOBDo_Y"),
-    ("ec734593c0a61678f8a9399f1325d180", "https://www.youtube.com/watch?v=wW6ykueIhX8"),
+    ("e730c19bafc2ebe5ee597430650091f7", "https://www.youtube.com/watch?v=uMMUcxvWOkY"),
+    ("8758273b93c7772140e982e93806d3c2", "https://www.youtube.com/watch?v=Zi_XLOBDo_Y"),
+    ("43926d42e791b33308a024af34247318", "https://www.youtube.com/watch?v=wW6ykueIhX8"),
 ]
 
 dbfile = "env.lib.db"

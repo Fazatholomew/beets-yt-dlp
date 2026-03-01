@@ -52,6 +52,14 @@ class YtDlpPlugin(BeetsPlugin):
         """
         super(YtDlpPlugin, self).__init__()
 
+        self._js_runtime = self._detect_js_runtime()
+        if self._js_runtime is None:
+            self._log.warning(
+                "No JavaScript runtime found (bun, deno, or node). "
+                "YouTube downloads will likely fail. "
+                "Install one: https://github.com/yt-dlp/yt-dlp/wiki/EJS"
+            )
+
         self.config_dir = config.config_dir()
         self.cache_dir = self.config_dir + "/yt-dlp-cache"
         self.outtmpl = self.cache_dir + "/%(id)s/%(id)s.%(ext)s"
@@ -82,12 +90,34 @@ class YtDlpPlugin(BeetsPlugin):
                 ],
             },
         }
-        self._config.update(self.config)
+
+        if self._js_runtime:
+            self._config["youtubedl_options"]["extractor_args"] = {
+                "youtube": {"js_runtimes": [self._js_runtime]}
+            }
+
+        for key in self.config.keys():
+            if key == "youtubedl_options":
+                user_ydl_opts = self.config["youtubedl_options"].get(dict)
+                self._config["youtubedl_options"].update(user_ydl_opts)
+            else:
+                self._config[key] = self.config[key].get()
         self.config = self._config
 
         # be verbose if beets is verbose
         if not self.config.get("verbose"):
             self.config["verbose"] = True
+
+    def _detect_js_runtime(self):
+        """Return the name of the first available JS runtime, or None if none found.
+
+        yt-dlp supports: deno (default), node, bun, quickjs.
+        We check in preference order: bun > node > deno > quickjs.
+        """
+        for runtime in ("bun", "node", "deno", "qjs"):
+            if shutil.which(runtime):
+                return runtime
+        return None
 
     def commands(self):
         outer_class = self
@@ -574,7 +604,6 @@ class YtDlpPlugin(BeetsPlugin):
 
         Tries to parse metadata from the video description.
         """
-        # @TODO check for overwrites according to options
 
         if self.config.get("verbose"):
             print("[yt-dlp] Splitting tracks")
@@ -583,7 +612,7 @@ class YtDlpPlugin(BeetsPlugin):
         ffmpeg_cmd = ["ffmpeg", "-y", "-i", self.audio_file, "-acodec", "copy"]
 
         if not os.path.exists(self.outdir):
-            os.mkdir(self.outdir)
+            os.makedirs(self.outdir)
 
         file_id = os.path.basename(os.path.normpath(self.outdir))
 

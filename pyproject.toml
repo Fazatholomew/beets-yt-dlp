@@ -9,6 +9,12 @@ dependencies = [
     "yt-dlp>=2026.2.21",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Fazatholomew/beets-yt-dlp"
+
+[project.entry-points."beets.plugins"]
+yt_dlp = "beetsplug.yt_dlp:YtDlpPlugin"
+
 [tool.uv]
 override-dependencies = [
   "llvmlite; sys_platform == 'never'"
