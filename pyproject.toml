@@ -1,0 +1,15 @@
+[project]
+name = "beets-yt-dlp"
+version = "0.1.0"
+description = "Download audio from youtube-dl soures and import into beets"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "beets>=2.6.2",
+    "yt-dlp>=2026.2.21",
+]
+
+[tool.uv]
+override-dependencies = [
+  "llvmlite; sys_platform == 'never'"
+]
